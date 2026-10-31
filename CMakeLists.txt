@@ -24,6 +24,13 @@ add_executable(game
     src/Lobby.cpp
     src/Loadouts.cpp
     src/Workshop.cpp
+    src/Settings.cpp
+    src/SettingsScreen.cpp
+    src/Map.cpp
+    src/Match.cpp
+    src/Bots.cpp
+    src/MatchHud.cpp
+    src/Sounds.cpp
 )
 target_link_libraries(game PRIVATE raylib)
 

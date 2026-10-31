@@ -130,7 +130,7 @@ void setupGameData() {
     WEAPONS.push_back(pistol);
 
     WeaponDef shotgun;
-    shotgun.name = "Shawty";
+    shotgun.name = "SHAWTY";
     shotgun.weaponClass = "Shotgun";
     shotgun.base = { 80, 20, 30, 40, 50 };
     shotgun.fireRate = 75;

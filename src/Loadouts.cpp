@@ -66,9 +66,14 @@ static void equipmentCard(Rectangle r, const char* label, const char* const* nam
 static void drawWeaponPreview(App& app, const WeaponBuild& build, Rectangle area, const char* label, int which) {
     static RenderTexture2D targets[2] = {};
     RenderTexture2D& target = targets[which];
-    if (target.id == 0 || target.texture.width != (int)area.width || target.texture.height != (int)area.height) {
+    // Size it in real pixels (so it's sharp in big windows), times the render scale setting
+    float pixels = ui::pixelScale() * ui::renderScalePercent() / 100.0f;
+    int texW = (int)(area.width * pixels);
+    int texH = (int)(area.height * pixels);
+    if (target.id == 0 || target.texture.width != texW || target.texture.height != texH) {
         if (target.id != 0) UnloadRenderTexture(target);
-        target = LoadRenderTexture((int)area.width, (int)area.height);
+        target = LoadRenderTexture(texW, texH);
+        SetTextureFilter(target.texture, TEXTURE_FILTER_BILINEAR);
     }
 
     // Same size for every weapon so long guns look long, but shrink one
@@ -91,6 +96,7 @@ static void drawWeaponPreview(App& app, const WeaponBuild& build, Rectangle area
     app.assets.drawWeapon(build, position, -12 + app.previewYaw, scale);
     EndMode3D();
     EndTextureMode();
+    ui::restoreCanvas();   // EndTextureMode switched back to the unscaled window, so scale it again
 
     // A soft lit backdrop so the dark metal stands out
     ui::verticalGradient(area, Fade(ui::TEXT_DIM, 0.24f), Fade(ui::TEXT_DIM, 0.06f));
@@ -104,8 +110,8 @@ static void drawWeaponPreview(App& app, const WeaponBuild& build, Rectangle area
 }
 
 void updateLoadouts(App& app) {
-    int w = GetScreenWidth();
-    int h = GetScreenHeight();
+    int w = ui::WIDTH;
+    int h = ui::HEIGHT;
 
     ui::verticalGradient({ 0, 0, (float)w, (float)h }, { 24, 26, 24, 255 }, { 8, 8, 8, 255 });
     DrawCircleGradient(w - 300, h / 2 + 80, 380, Fade(ui::TEXT_DIM, 0.12f), Fade(ui::TEXT_DIM, 0.0f));

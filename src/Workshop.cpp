@@ -117,9 +117,9 @@ static void attachmentsTab(App& app, WeaponBuild& build) {
 
     // Draw the 3D weapon first so the menus appear on top of it
     handlePreviewDrag(app, { 420, 120, 600, 360 });
-    BeginMode3D(camera);
+    ui::begin3D(camera);
     app.assets.drawWeapon(shown, weaponPos, yaw, scale);
-    EndMode3D();
+    ui::end3D();
 
     hoveredAttachment = -2;
     if (app.selectedSlot >= 0) {
@@ -133,7 +133,7 @@ static void attachmentsTab(App& app, WeaponBuild& build) {
     for (int slot = 0; slot < SLOT_COUNT; slot++) {
         Vector2 pos = SLOT_LABEL_POSITIONS[slot];
         Rectangle box = { pos.x, pos.y, LABEL_WIDTH, LABEL_HEIGHT };
-        Vector2 target = GetWorldToScreen(app.assets.slotAnchor(shown, slot, weaponPos, yaw, scale), camera);
+        Vector2 target = GetWorldToScreenEx(app.assets.slotAnchor(shown, slot, weaponPos, yaw, scale), camera, ui::WIDTH, ui::HEIGHT);
         Vector2 start = { box.x + (target.x < box.x ? 0 : box.width), box.y + box.height / 2 };
         if (target.x > box.x && target.x < box.x + box.width) {
             start = { box.x + box.width / 2, target.y < box.y ? box.y : box.y + box.height };
@@ -158,7 +158,7 @@ static void attachmentsTab(App& app, WeaponBuild& build) {
         }
     }
 
-    drawStats(build, shown, 40, (float)GetScreenHeight() - 250);
+    drawStats(build, shown, 40, (float)ui::HEIGHT - 250);
 }
 
 // ------------------------------------------------------------
@@ -224,14 +224,14 @@ static void appearanceTab(App& app, WeaponBuild& build) {
     Camera3D camera = weaponCamera();
     camera.position = { -0.25f, 0.15f, 2.4f };
     camera.target = { -0.25f, 0, 0 };
-    BeginMode3D(camera);
+    ui::begin3D(camera);
     app.assets.drawWeapon(shown, { -0.35f, 0, 0 }, -15 + app.previewYaw, 0.85f / fmaxf(WEAPONS[build.weapon].bodyLength, 0.7f));
-    EndMode3D();
+    ui::end3D();
 
     // Info about the selected camo
     const Camo& camo = CAMOS[app.selectedCamo];
     bool camoUnlocked = isUnlocked(app, build.weapon, camo.unlockLevel);
-    float infoX = 520, infoY = (float)GetScreenHeight() - 220;
+    float infoX = 520, infoY = (float)ui::HEIGHT - 220;
     if (build.camo == app.selectedCamo) {
         Rectangle tag = { infoX, infoY, 100, 22 };
         ui::outline(tag, 1, ui::ACCENT);
@@ -281,9 +281,9 @@ static void progressionTab(App& app, WeaponBuild& build) {
     Camera3D camera = weaponCamera();
     camera.position = { -0.5f, 0.2f, 2.6f };
     camera.target = { -0.5f, 0, 0 };
-    BeginMode3D(camera);
+    ui::begin3D(camera);
     app.assets.drawWeapon(build, { -0.4f, 0, 0 }, -15 + app.previewYaw, 0.8f / fmaxf(WEAPONS[build.weapon].bodyLength, 0.7f));
-    EndMode3D();
+    ui::end3D();
 
     // Level and XP
     float x = 40, y = 120;
@@ -326,8 +326,8 @@ static void progressionTab(App& app, WeaponBuild& build) {
 
     // A scrolling row of unlock cards along the bottom
     float cardW = 170, cardH = 120, cardGap = 10;
-    float rowY = (float)GetScreenHeight() - 190;
-    float rowWidth = (float)GetScreenWidth() - 80;
+    float rowY = (float)ui::HEIGHT - 190;
+    float rowWidth = (float)ui::WIDTH - 80;
     float maxScroll = std::max(0.0f, unlocks.size() * (cardW + cardGap) - rowWidth);
     unlockScroll -= GetMouseWheelMove() * 60;
     if (ui::button({ 40, rowY - 44, 36, 30 }, "<")) unlockScroll -= (cardW + cardGap) * 3;
@@ -335,7 +335,7 @@ static void progressionTab(App& app, WeaponBuild& build) {
     unlockScroll = std::clamp(unlockScroll, 0.0f, maxScroll);
     ui::text("Scroll or use the arrows to see every unlock", 132, rowY - 38, 16, ui::TEXT_DIM);
 
-    BeginScissorMode(40, (int)rowY, (int)rowWidth, (int)cardH);
+    ui::beginClip({ 40, rowY, rowWidth, cardH });
     for (size_t i = 0; i < unlocks.size(); i++) {
         const Unlock& u = unlocks[i];
         Rectangle card = { 40 + i * (cardW + cardGap) - unlockScroll, rowY, cardW, cardH };
@@ -347,14 +347,14 @@ static void progressionTab(App& app, WeaponBuild& build) {
         ui::text(u.name.c_str(), card.x + 12, card.y + 88, 14, done ? ui::TEXT : ui::LOCKED);
         if (!done) ui::lockIcon(card.x + cardW - 26, card.y + 10, 14, ui::LOCKED);
     }
-    EndScissorMode();
+    ui::endClip();
 }
 
 // ------------------------------------------------------------
 
 void updateWorkshop(App& app) {
-    int w = GetScreenWidth();
-    int h = GetScreenHeight();
+    int w = ui::WIDTH;
+    int h = ui::HEIGHT;
     WeaponBuild& build = app.editedWeapon();
     const WeaponDef& weapon = WEAPONS[build.weapon];
     const WeaponProgress& progress = app.profile.weaponProgress[build.weapon];

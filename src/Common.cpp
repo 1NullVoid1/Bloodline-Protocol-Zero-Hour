@@ -8,7 +8,7 @@ void drawTopBar(App& app, const char* breadcrumb, const char* title) {
     ui::text(title, 60, 40, 40, ui::TEXT);
 
     // Player badge
-    float right = (float)GetScreenWidth() - 30;
+    float right = (float)ui::WIDTH - 30;
     Rectangle badge = { right - 190, 26, 190, 46 };
     ui::panel(badge, ui::PANEL);
     ui::outline(badge, 1, Fade(ui::TEXT_DIM, 0.4f));
@@ -21,6 +21,6 @@ void drawTopBar(App& app, const char* breadcrumb, const char* title) {
 // Click and drag inside `area` to spin the 3D preview
 void handlePreviewDrag(App& app, Rectangle area) {
     if (IsMouseButtonDown(MOUSE_BUTTON_LEFT) && ui::isHovered(area)) {
-        app.previewYaw += GetMouseDelta().x * 0.4f;
+        app.previewYaw += ui::mouseDelta().x * 0.4f;
     }
 }

@@ -14,13 +14,13 @@ static void drawSmoke(float time) {
 }
 
 void updateMainMenu(App& app) {
-    int w = GetScreenWidth();
-    int h = GetScreenHeight();
+    int w = ui::WIDTH;
+    int h = ui::HEIGHT;
 
     // Background: dark gradient with a warm glow on the left
     ui::verticalGradient({ 0, 0, (float)w, (float)h }, { 30, 30, 26, 255 }, { 8, 8, 8, 255 });
     DrawRectangleGradientH(0, 0, 520, h, Fade(ui::ACCENT, 0.18f), Fade(ui::ACCENT, 0.0f));
-    drawSmoke(app.time);
+    if (app.settings.menuEffects) drawSmoke(app.time);
 
     // Title
     ui::text(GAME_TITLE, 80, 90, 72, ui::TEXT);
@@ -34,10 +34,10 @@ void updateMainMenu(App& app) {
     camera.up = { 0, 1, 0 };
     camera.fovy = 40;
     camera.projection = CAMERA_PERSPECTIVE;
-    BeginMode3D(camera);
+    ui::begin3D(camera);
     Loadout& loadout = app.profile.loadouts[app.selectedLoadout];
     app.assets.drawSoldier(loadout.primary, { 1.3f, 0, 0 }, -18 + sinf(app.time * 0.4f) * 6, app.time);
-    EndMode3D();
+    ui::end3D();
 
     // Menu entries
     float x = 80, y = 300, width = 380, height = 64, gap = 10;
@@ -52,7 +52,8 @@ void updateMainMenu(App& app) {
     }
     y += height + gap;
     if (ui::menuButton({ x, y, width, height }, "SETTINGS", nullptr, false, true)) {
-        ui::showToast("Settings are coming later");
+        app.settingsReturnTo = Screen::MainMenu;
+        app.screen = Screen::Settings;
     }
 
     if (ui::menuButton({ x, (float)h - 120, width, 52 }, "QUIT TO DESKTOP", nullptr, false, true)) {

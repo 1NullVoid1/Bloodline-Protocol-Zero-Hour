@@ -2,7 +2,7 @@
 #include "rlgl.h"
 #include <cmath>
 
-const int CAMO_SIZE = 128;   // camo textures are 128x128 pixels
+const int CAMO_SIZE = 128;   // camo patterns are designed on a 128x128 grid
 
 // ------------------------------------------------------------
 // Noise: smooth random patterns, the secret ingredient of camo
@@ -118,36 +118,49 @@ static Color camoPixel(const Camo& camo, int x, int y, int seed) {
     }
 }
 
-static Texture2D makeCamoTexture(const Camo& camo, int seed) {
-    Color* pixels = (Color*)MemAlloc(CAMO_SIZE * CAMO_SIZE * sizeof(Color));
-    for (int y = 0; y < CAMO_SIZE; y++) {
-        for (int x = 0; x < CAMO_SIZE; x++) {
-            pixels[y * CAMO_SIZE + x] = camoPixel(camo, x, y, seed);
+// `size` is 128 for high quality or 64 for low. At 64 we skip every other
+// pattern pixel, so the camo looks the same, just less detailed.
+static Texture2D makeCamoTexture(const Camo& camo, int seed, int size) {
+    int step = CAMO_SIZE / size;
+    Color* pixels = (Color*)MemAlloc(size * size * sizeof(Color));
+    for (int y = 0; y < size; y++) {
+        for (int x = 0; x < size; x++) {
+            pixels[y * size + x] = camoPixel(camo, x * step, y * step, seed);
         }
     }
-    Image image = { pixels, CAMO_SIZE, CAMO_SIZE, 1, PIXELFORMAT_UNCOMPRESSED_R8G8B8A8 };
+    Image image = { pixels, size, size, 1, PIXELFORMAT_UNCOMPRESSED_R8G8B8A8 };
     Texture2D texture = LoadTextureFromImage(image);
     UnloadImage(image);   // the GPU has its own copy now
     return texture;
 }
 
-void Assets::load() {
+void Assets::load(bool highTextures) {
     cube = LoadModelFromMesh(GenMeshCube(1, 1, 1));
 
     Image whiteImage = GenImageColor(4, 4, WHITE);
     white = LoadTextureFromImage(whiteImage);
     UnloadImage(whiteImage);
 
+    reloadCamos(highTextures);
+}
+
+void Assets::unloadCamos() {
+    for (Texture2D& t : camoTextures) {
+        UnloadTexture(t);
+    }
     camoTextures.clear();
+}
+
+void Assets::reloadCamos(bool highTextures) {
+    unloadCamos();
+    int size = highTextures ? CAMO_SIZE : CAMO_SIZE / 2;
     for (size_t i = 0; i < CAMOS.size(); i++) {
-        camoTextures.push_back(makeCamoTexture(CAMOS[i], (int)i * 31 + 5));
+        camoTextures.push_back(makeCamoTexture(CAMOS[i], (int)i * 31 + 5, size));
     }
 }
 
 void Assets::unload() {
-    for (Texture2D& t : camoTextures) {
-        UnloadTexture(t);
-    }
+    unloadCamos();
     UnloadTexture(white);
     // The cube's material would try to unload our textures too, so point it back at the default first
     cube.materials[0].maps[MATERIAL_MAP_DIFFUSE].texture = { rlGetTextureIdDefault(), 1, 1, 1, PIXELFORMAT_UNCOMPRESSED_R8G8B8A8 };
@@ -300,15 +313,12 @@ Vector3 Assets::slotAnchor(const WeaponBuild& build, int slot, Vector3 position,
     return { position.x + x * scale, position.y + local.y * scale, position.z + z * scale };
 }
 
-void Assets::drawSoldier(const WeaponBuild& weapon, Vector3 position, float yaw, float time) const {
-    const Color fatigues = { 58, 62, 52, 255 };
-    const Color vest = { 85, 90, 65, 255 };
+void Assets::drawSoldier(const WeaponBuild& weapon, Vector3 position, float yaw, float time,
+                         const SoldierStyle& style) const {
     const Color boots = { 30, 28, 26, 255 };
     const Color gloves = { 40, 38, 34, 255 };
     const Color helmet = { 70, 74, 62, 255 };
     const Color face = { 45, 45, 48, 255 };       // balaclava
-    const Color visor = { 60, 150, 140, 255 };
-    const Color patch = { 222, 178, 82, 255 };
 
     float breathe = sinf(time * 2.0f) * 0.008f;
 
@@ -316,36 +326,53 @@ void Assets::drawSoldier(const WeaponBuild& weapon, Vector3 position, float yaw,
     rlTranslatef(position.x, position.y, position.z);
     rlRotatef(yaw, 0, 1, 0);
 
-    // Legs
-    part({ -0.12f, 0.06f, 0.02f }, { 0.14f, 0.12f, 0.24f }, boots, nullptr);
-    part({ 0.12f, 0.06f, 0.02f },  { 0.14f, 0.12f, 0.24f }, boots, nullptr);
-    part({ -0.12f, 0.5f, 0 }, { 0.16f, 0.78f, 0.18f }, fatigues, nullptr);
-    part({ 0.12f, 0.5f, 0 },  { 0.16f, 0.78f, 0.18f }, fatigues, nullptr);
-    part({ 0, 0.92f, 0 }, { 0.42f, 0.14f, 0.22f }, fatigues, nullptr);    // hips
+    // Legs: each one swings from the hip while running
+    for (int side = -1; side <= 1; side += 2) {
+        float x = 0.12f * side;
+        rlPushMatrix();
+        rlTranslatef(x, 0.9f, 0);
+        rlRotatef(style.stride * 32 * side, 1, 0, 0);
+        part({ 0, -0.4f, 0 }, { 0.16f, 0.78f, 0.18f }, style.uniform, nullptr);
+        part({ 0, -0.84f, 0.02f }, { 0.14f, 0.12f, 0.24f }, boots, nullptr);
+        rlPopMatrix();
+    }
+    part({ 0, 0.92f, 0 }, { 0.42f, 0.14f, 0.22f }, style.uniform, nullptr);    // hips
 
     // Torso and vest
-    part({ 0, 1.2f + breathe, 0 }, { 0.46f, 0.46f, 0.24f }, fatigues, nullptr);
-    part({ 0, 1.2f + breathe, 0.02f }, { 0.48f, 0.4f, 0.26f }, vest, nullptr);
-    part({ -0.12f, 1.12f + breathe, 0.15f }, { 0.1f, 0.12f, 0.05f }, vest, nullptr);   // pouches
-    part({ 0.0f, 1.12f + breathe, 0.15f },   { 0.1f, 0.12f, 0.05f }, vest, nullptr);
-    part({ 0.12f, 1.12f + breathe, 0.15f },  { 0.1f, 0.12f, 0.05f }, vest, nullptr);
-    part({ -0.27f, 1.32f + breathe, 0 }, { 0.04f, 0.08f, 0.1f }, patch, nullptr);       // shoulder patch
+    part({ 0, 1.2f + breathe, 0 }, { 0.46f, 0.46f, 0.24f }, style.uniform, nullptr);
+    part({ 0, 1.2f + breathe, 0.02f }, { 0.48f, 0.4f, 0.26f }, style.vest, nullptr);
+    part({ -0.12f, 1.12f + breathe, 0.15f }, { 0.1f, 0.12f, 0.05f }, style.vest, nullptr);   // pouches
+    part({ 0.0f, 1.12f + breathe, 0.15f },   { 0.1f, 0.12f, 0.05f }, style.vest, nullptr);
+    part({ 0.12f, 1.12f + breathe, 0.15f },  { 0.1f, 0.12f, 0.05f }, style.vest, nullptr);
+    part({ -0.27f, 1.32f + breathe, 0 }, { 0.04f, 0.08f, 0.1f }, style.patch, nullptr);       // shoulder patch
 
     // Head
     part({ 0, 1.58f + breathe, 0 }, { 0.2f, 0.24f, 0.22f }, face, nullptr);
     part({ 0, 1.71f + breathe, -0.01f }, { 0.26f, 0.1f, 0.27f }, helmet, nullptr);
-    part({ 0, 1.6f + breathe, 0.115f }, { 0.18f, 0.05f, 0.02f }, visor, nullptr);
+    part({ 0, 1.6f + breathe, 0.115f }, { 0.18f, 0.05f, 0.02f }, style.visor, nullptr);
 
-    // Arms reaching for the weapon
-    part({ -0.27f, 1.2f + breathe, 0.06f }, { 0.12f, 0.36f, 0.14f }, fatigues, nullptr);
-    part({ 0.27f, 1.2f + breathe, 0.06f },  { 0.12f, 0.36f, 0.14f }, fatigues, nullptr);
-    part({ -0.18f, 1.02f + breathe, 0.2f }, { 0.1f, 0.1f, 0.26f }, fatigues, nullptr);
-    part({ 0.2f, 1.06f + breathe, 0.2f },   { 0.1f, 0.1f, 0.26f }, fatigues, nullptr);
-    part({ -0.13f, 1.0f + breathe, 0.33f }, { 0.08f, 0.08f, 0.08f }, gloves, nullptr);
-    part({ 0.2f, 1.04f + breathe, 0.33f },  { 0.08f, 0.08f, 0.08f }, gloves, nullptr);
+    if (style.aimingForward) {
+        // Arms raised, weapon pointing straight ahead (the soldier faces +z)
+        part({ -0.25f, 1.27f + breathe, 0.1f }, { 0.12f, 0.13f, 0.3f }, style.uniform, nullptr);   // right arm
+        part({ -0.16f, 1.23f + breathe, 0.3f }, { 0.1f, 0.1f, 0.2f }, style.uniform, nullptr);
+        part({ -0.1f, 1.22f + breathe, 0.4f }, { 0.08f, 0.08f, 0.08f }, gloves, nullptr);
+        part({ 0.25f, 1.27f + breathe, 0.14f }, { 0.12f, 0.13f, 0.34f }, style.uniform, nullptr);   // left arm
+        part({ 0.12f, 1.27f + breathe, 0.42f }, { 0.1f, 0.1f, 0.3f }, style.uniform, nullptr);
+        part({ -0.02f, 1.28f + breathe, 0.6f }, { 0.08f, 0.08f, 0.08f }, gloves, nullptr);
+        part({ 0.27f, 1.3f + breathe, 0.06f }, { 0.13f, 0.06f, 0.15f }, style.patch, nullptr);     // armband
+        drawWeapon(weapon, { -0.07f, 1.33f + breathe, 0.45f }, -90, 0.85f);
+    } else {
+        // Arms reaching for the weapon
+        part({ -0.27f, 1.2f + breathe, 0.06f }, { 0.12f, 0.36f, 0.14f }, style.uniform, nullptr);
+        part({ 0.27f, 1.2f + breathe, 0.06f },  { 0.12f, 0.36f, 0.14f }, style.uniform, nullptr);
+        part({ -0.18f, 1.02f + breathe, 0.2f }, { 0.1f, 0.1f, 0.26f }, style.uniform, nullptr);
+        part({ 0.2f, 1.06f + breathe, 0.2f },   { 0.1f, 0.1f, 0.26f }, style.uniform, nullptr);
+        part({ -0.13f, 1.0f + breathe, 0.33f }, { 0.08f, 0.08f, 0.08f }, gloves, nullptr);
+        part({ 0.2f, 1.04f + breathe, 0.33f },  { 0.08f, 0.08f, 0.08f }, gloves, nullptr);
 
-    // The weapon, held across the chest pointing down-left
-    drawWeapon(weapon, { 0.02f, 1.05f + breathe, 0.34f }, -150, 0.85f);
+        // The weapon, held across the chest pointing down-left
+        drawWeapon(weapon, { 0.02f, 1.05f + breathe, 0.34f }, -150, 0.85f);
+    }
 
     rlPopMatrix();
 }
