@@ -5,7 +5,7 @@ No matches are playable yet. That comes next.
 
 ## How to build (Windows, Visual Studio)
 
-1. Put this folder somewhere new, e.g. `Documents\NullVoid` (keep `CMakeLists.txt` next to the `src` and `assets` folders).
+1. Put this folder somewhere new, e.g. `Documents\Bloodline-Protocol-Zero-Hour` (keep `CMakeLists.txt` next to the `src` and `assets` folders).
 2. Visual Studio > **Open a local folder** > pick that folder.
 3. Wait for CMake to finish (the first time it downloads raylib, which takes a minute).
 4. Pick **game.exe** in the green Play dropdown and press Play.
