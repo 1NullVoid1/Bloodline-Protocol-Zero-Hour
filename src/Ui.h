@@ -42,6 +42,9 @@ void setRenderScale(int percent);
 int renderScalePercent();
 void begin3D(Camera3D camera);
 void end3D();
+// Inside begin3D/end3D: draw the next things on top of everything drawn so far,
+// with their own near and far limits. Used for your gun, so it never goes into walls.
+void beginCloseUp(Camera3D camera, double nearPlane, double farPlane);
 
 // Only draw inside r until endClip() (like BeginScissorMode, but in menu pixels)
 void beginClip(Rectangle r);

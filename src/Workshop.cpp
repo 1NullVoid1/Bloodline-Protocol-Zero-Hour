@@ -308,6 +308,7 @@ static void progressionTab(App& app, WeaponBuild& build) {
     ui::text("UNLOCKS", x, y, 18, ui::TEXT_DIM);
     ui::text(TextFormat("%d / %d", unlockedCount, (int)unlocks.size()), x, y + 24, 40, ui::OLIVE);
 
+#ifndef NDEBUG
     // Testing buttons, so you can try the unlocks without playing matches
     y += 90;
     ui::text("TESTING", x, y, 14, ui::TEXT_DIM);
@@ -323,6 +324,7 @@ static void progressionTab(App& app, WeaponBuild& build) {
         build.weapon = weaponIndex;
         app.selectedCamo = 0;
     }
+#endif
 
     // A scrolling row of unlock cards along the bottom
     float cardW = 170, cardH = 120, cardGap = 10;
@@ -385,6 +387,7 @@ void updateWorkshop(App& app) {
     if (ui::tab({ 782, 30, 150, 36 }, "PROGRESSION", app.workshopTab == WorkshopTab::Progression)) {
         app.workshopTab = WorkshopTab::Progression;
     }
+
 
     ui::backHint("BACK");
     ui::textRight("Drag the weapon to rotate it", (float)w - 30, (float)h - 40, 16, Fade(ui::TEXT_DIM, 0.7f));

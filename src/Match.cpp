@@ -69,8 +69,22 @@ float effectiveRange(const Gun& gun) {
 // Shotguns fire a spray of pellets
 int pelletCount(const Gun& gun) { return isClass(gun, "Shotgun") ? 8 : 1; }
 
+// Which optic is on the gun: 0 = iron sights, 1 = red dot, 2 = holo, 3 = scope
+int opticLook(const Gun& gun) { return attachmentLook(gun.build, SLOT_OPTIC); }
+
+// Snipers always look through a scope. Other guns do when they have the scope attachment.
+bool usesScope(const Gun& gun) { return isClass(gun, "Sniper Rifle") || opticLook(gun) == 3; }
+
 // How much aiming down sights zooms in
-float aimZoom(const Gun& gun) { return isClass(gun, "Sniper Rifle") ? 3.5f : 1.35f; }
+float aimZoom(const Gun& gun) {
+    if (isClass(gun, "Sniper Rifle")) return 3.5f;
+    switch (opticLook(gun)) {
+        case 1:  return 1.4f;    // red dot
+        case 2:  return 1.3f;    // holo (bigger window, less zoom)
+        case 3:  return 2.5f;    // scope
+        default: return 1.2f;    // iron sights
+    }
+}
 
 float damageAt(const Gun& gun, float distance, bool headshot) {
     float damage = (float)gun.stats.damage;
@@ -262,10 +276,11 @@ static void killSoldier(Match& match, int victim, int attacker, bool headshot) {
     if (match.killFeed.size() > 6) match.killFeed.erase(match.killFeed.begin());
 
     if (a.isPlayer) {
-        // Kills give XP to the gun you're holding
+        // Kills give XP to you and to the gun you're holding
         int xp = headshot ? 150 : 100;
         match.gunKills[a.currentGun]++;
         match.gunXp[a.currentGun] += xp;
+        match.killXp += xp;
         if (headshot) match.headshots++;
         addPopup(match, TextFormat("+%d  %s", xp, headshot ? "HEADSHOT" : "KILL"), ui::ACCENT);
         addPopup(match, "KILLED " + v.name, ui::TEXT);
@@ -479,8 +494,13 @@ void startMatch(App& app) {
             s.isPlayer = (team == 0 && i == 0);
             if (s.isPlayer) {
                 s.name = "YOU";
-                s.guns[0] = makeGun(loadout.primary);
-                s.guns[1] = makeGun(loadout.secondary);
+                // A locked gun in the loadout gets swapped for a starter gun
+                WeaponBuild primary = loadout.primary;
+                WeaponBuild secondary = loadout.secondary;
+                if (!weaponUnlocked(app.profile, primary.weapon)) { primary = WeaponBuild(); primary.weapon = 0; }
+                if (!weaponUnlocked(app.profile, secondary.weapon)) { secondary = WeaponBuild(); secondary.weapon = 3; }
+                s.guns[0] = makeGun(primary);
+                s.guns[1] = makeGun(secondary);
             } else {
                 s.name = BOT_NAMES[names[nextName++]];
                 s.guns[0] = makeGun(randomBotWeapon());
@@ -751,14 +771,17 @@ static SoldierStyle teamStyle(const Soldier& s) {
     return style;
 }
 
-// Your gun, drawn small and close to the camera so it never pokes into walls
+// Your gun. It's drawn small and close to the camera, after everything else,
+// on top of the world (ui::beginCloseUp), so it never pokes into walls.
 static void drawViewModel(App& app, const Camera3D& camera) {
     const Match& match = app.match;
     const Soldier& you = match.soldiers[0];
     if (!you.alive) return;
     const Gun& gun = you.gun();
     float aim = match.aimAmount;
-    if (isClass(gun, "Sniper Rifle") && aim > 0.85f) return;   // looking through the scope instead
+    if (usesScope(gun) && aim > 0.85f) return;   // looking through the scope instead (MatchHud.cpp)
+
+    ui::beginCloseUp(camera, 0.005, 5);
 
     rlPushMatrix();
     rlTranslatef(camera.position.x, camera.position.y, camera.position.z);
@@ -767,23 +790,34 @@ static void drawViewModel(App& app, const Camera3D& camera) {
     // Now +z is straight ahead, -x is to the right, +y is up
 
     const float scale = 0.15f;
-    Vector3 hip = { -0.056f, -0.058f, 0.155f };
-    Vector3 aimed = { 0, -0.04f, 0.13f };
-    Vector3 p = Vector3Lerp(hip, aimed, aim);
 
-    // Sway and bob
-    float still = 1 - aim * 0.85f;
+    // Hip fire: down and to the right, turned in a little so you can see the side of the gun
+    Vector3 hip = { -0.048f, -0.038f, 0.125f };
+    float hipTurn = 6;   // degrees
+
+    // Aiming: the sight is moved to the exact middle of the screen, a little in front of your eye
+    SightPoint sight = app.assets.sightPoint(gun.build);
+    float eyeGap = usesScope(gun) ? 0.05f : 0.065f;   // meters from your eye to the back of the sight
+    Vector3 aimed = { 0, -sight.y * scale, eyeGap - sight.x * scale };
+
+    // Ease in and out so the gun doesn't move in a straight robotic line
+    float t = aim * aim * (3 - 2 * aim);
+    Vector3 p = Vector3Lerp(hip, aimed, t);
+
+    // Sway and bob (much less while aiming)
+    float still = 1 - t * 0.9f;
     p.x += sinf(match.swayTime * 1.3f) * 0.002f * still + sinf(you.stridePhase) * 0.005f * fabsf(you.stride) * still;
     p.y += cosf(match.swayTime * 1.7f) * 0.0015f * still - fabsf(you.stride) * 0.004f * still;
     p.z -= match.recoil * 0.004f;   // kicks back when firing
 
     rlTranslatef(p.x, p.y, p.z);
+    rlRotatef(hipTurn * (1 - t), 0, 1, 0);
 
     // Lower the gun while reloading or sprinting
     float lower = 0;
     if (gun.reloadTimer > 0) {
-        float t = 1 - gun.reloadTimer / reloadTime(gun);   // 0 to 1 through the reload
-        lower = sinf(t * PI);
+        float r = 1 - gun.reloadTimer / reloadTime(gun);   // 0 to 1 through the reload
+        lower = sinf(r * PI);
     }
     bool sprinting = match.sprinting && you.onGround;
     if (sprinting) rlRotatef(25, 0, 1, 0);
@@ -889,8 +923,14 @@ void updateMatch(App& app) {
                 const Gun& gun = match.soldiers[0].guns[g];
                 if (match.gunXp[g] > 0) addWeaponXp(app.profile.weaponProgress[gun.build.weapon], match.gunXp[g]);
             }
-            int total = match.gunXp[0] + match.gunXp[1];
-            if (total > 0) ui::showToast(TextFormat("Left the match: +%d weapon XP", total));
+            int levelBefore = app.profile.playerLevel;
+            addPlayerXp(app.profile, match.killXp);
+            saveProfile(app.profile);
+            if (app.profile.playerLevel > levelBefore) {
+                ui::showToast(TextFormat("Left the match: +%d XP. Player level %d!", match.killXp, app.profile.playerLevel));
+            } else if (match.killXp > 0) {
+                ui::showToast(TextFormat("Left the match: +%d XP", match.killXp));
+            }
             app.screen = Screen::Lobby;
         } else if (!match.paused) {
             resume(match);   // RESUME was clicked
@@ -927,6 +967,22 @@ void finishMatch(App& app) {
             if (c.unlockLevel > r.levelBefore && c.unlockLevel <= r.levelAfter) r.unlocks.push_back(c.name + " camo");
         }
     }
+
+    // Player XP: your kills plus a bonus for finishing
+    PlayerXpResult& p = match.playerResult;
+    p.killXp = match.killXp;
+    p.bonusXp = (match.winner == 0) ? WIN_BONUS_XP : (match.winner == 1) ? LOSS_BONUS_XP : DRAW_BONUS_XP;
+    p.levelBefore = app.profile.playerLevel;
+    addPlayerXp(app.profile, p.killXp + p.bonusXp);
+    for (const WeaponDef& w : WEAPONS) {
+        if (w.unlockLevel > p.levelBefore && w.unlockLevel <= p.levelAfter) {
+            p.unlocks.push_back(w.name);
+        }
+    }
+    p.levelAfter = app.profile.playerLevel;
+    p.xpAfter = app.profile.playerXp;
+
+    saveProfile(app.profile);   // so your levels are still there next time
     match.resultsReady = true;
     EnableCursor();
     app.screen = Screen::MatchResults;

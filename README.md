@@ -4,7 +4,7 @@ Main menu, lobby, loadouts, the weapon workshop, settings, and Team Deathmatch a
 
 ## How to build (Windows, Visual Studio)
 
-1. Put this folder somewhere new, e.g. `Documents\BloodlineProtocol` (keep `CMakeLists.txt` next to the `src` and `assets` folders).
+1. Put this folder somewhere new, e.g. `Documents\Bloodline-Protocol-Zero-Hour` (keep `CMakeLists.txt` next to the `src` and `assets` folders).
 2. Visual Studio > **Open a local folder** > pick that folder.
 3. Wait for CMake to finish (the first time it downloads raylib, which takes a minute).
 4. Pick **game.exe** in the green Play dropdown and press Play.
@@ -24,7 +24,7 @@ Main menu, lobby, loadouts, the weapon workshop, settings, and Team Deathmatch a
 | Settings: Controls | Field of view and mouse sensitivity |
 | Settings: Audio | Master volume |
 | Match | Team Deathmatch, 6v6 against bots on KILN YARD. First team to 75 kills (or most kills after 10 minutes) wins |
-| Results | Victory or defeat, the scoreboard, your stats, and the XP, level-ups and unlocks for your weapons |
+| Results | Victory or defeat, the scoreboard, your stats, your player XP and level, and the XP, level-ups and unlocks for your weapons |
 
 **ESC** always goes back one screen. On the settings screen it also saves.
 
@@ -35,7 +35,7 @@ Main menu, lobby, loadouts, the weapon workshop, settings, and Team Deathmatch a
 | W A S D | Move |
 | Mouse | Look |
 | Left mouse | Shoot (hold for automatic guns) |
-| Right mouse | Aim down sights (hold) |
+| Right mouse | Aim down sights (hold). You look through your optic: iron sights, red dot, holo, or a scope |
 | Shift | Sprint |
 | Space | Jump |
 | C or Ctrl | Crouch |
@@ -45,10 +45,12 @@ Main menu, lobby, loadouts, the weapon workshop, settings, and Team Deathmatch a
 | Esc | Pause (resume, settings, or leave the match) |
 
 - You play with your selected loadout. Your guns' stats (with attachments) change how they work: damage per bullet, range before damage drops, spread, move speed, and reload and aim speed. The rules are in `Match.cpp` under "Gun rules".
-- Kills give 100 XP (150 for a headshot) to the gun you used. Finishing a match gives 300 more (600 for a win) to the gun you got the most kills with. Leaving early keeps the kill XP only.
+- Kills give 100 XP (150 for a headshot) to you and to the gun you used. Finishing a match gives the gun you got the most kills with 300 more (600 for a win), and gives you 500 (750 for a draw, 1000 for a win). Leaving early keeps the kill XP only.
+- Your player level (1 to 55) is in the top right of every menu, with a bar showing how close the next level is. Weapon levels (1 to 30) unlock attachments and camos.
+- Each optic zooms in a different amount when you aim: iron sights a little, red dot and holo a bit more, the scope a lot. With iron sights, line up the top of the front post with your target.
 - Bots spot enemies in front of them, take a moment to react, then shoot in bursts while strafing. To make them easier or harder, change the numbers at the top of `Bots.cpp`.
 - The minimap shows teammates all the time and enemies for a moment when they shoot.
-- Weapon levels aren't saved to a file yet, so they reset when you close the game.
+- Your player level, weapon levels and loadouts are saved to `profile.cfg` next to `game.exe` after every match and when you quit. Delete it to start over from level 1.
 
 ## Settings and slow PCs
 
@@ -68,6 +70,7 @@ Main menu, lobby, loadouts, the weapon workshop, settings, and Team Deathmatch a
 | `Ui.h/.cpp` | Colors, the 1280 x 720 canvas scaling, render scale for 3D, and reusable buttons, tabs, panels, selectors, sliders and stat bars |
 | `Common.cpp` | Top bar and drag-to-rotate shared by several screens |
 | `Settings.h/.cpp` | The settings, presets, saving and loading `settings.cfg`, and applying display mode and frame rate to the window |
+| `SaveFile.cpp` | Saving and loading your progress in `profile.cfg` |
 | `Map.h/.cpp` | The KILN YARD map (a list of boxes, mirrored so both sides are the same), spawn points, collision, and the grid of points bots walk between |
 | `Match.h/.cpp` | Starting a match, moving, shooting, damage, respawns, scoring, XP, and drawing the 3D world and your gun |
 | `Bots.cpp` | How bots spot, aim, shoot and find their way around |

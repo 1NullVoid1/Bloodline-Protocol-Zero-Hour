@@ -14,6 +14,12 @@ struct SoldierStyle {
     float stride = 0;                      // leg swing while running, from -1 to 1
 };
 
+// Where you look through a weapon's sights (see Assets::sightPoint)
+struct SightPoint {
+    float x;   // along the gun: the part of the sight nearest your eye
+    float y;   // height of the line you aim along
+};
+
 // The 3D placeholder art: a textured cube we stretch into weapon parts
 // and soldier body parts, plus one generated texture per camo.
 // Later you can swap these for real 3D models made in Blender.
@@ -35,6 +41,9 @@ struct Assets {
 
     // Where a slot's attachment sits on the weapon (used to point labels at it)
     Vector3 slotAnchor(const WeaponBuild& build, int slot, Vector3 position, float yaw, float scale) const;
+
+    // Where you look through the sights when aiming down sights
+    SightPoint sightPoint(const WeaponBuild& build) const;
 
     // Draw a camo swatch in 2D (for the camo grid)
     void drawCamoSwatch(int camo, Rectangle r) const;

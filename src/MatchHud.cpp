@@ -138,9 +138,7 @@ static void drawCrosshair(const Match& match, const Camera3D& camera) {
     const Soldier& you = match.soldiers[0];
     const Gun& gun = you.gun();
     float cx = ui::WIDTH / 2.0f, cy = ui::HEIGHT / 2.0f;
-    bool sniper = WEAPONS[gun.build.weapon].weaponClass == "Sniper Rifle";
-
-    if (sniper && match.aimAmount > 0.85f) {
+    if (usesScope(gun) && match.aimAmount > 0.85f) {
         // Looking through the scope: black around a circle, thin cross lines
         DrawRing({ cx, cy }, 320, 800, 0, 360, 72, BLACK);
         DrawLineEx({ cx - 320, cy }, { cx + 320, cy }, 1.5f, BLACK);
@@ -149,8 +147,18 @@ static void drawCrosshair(const Match& match, const Camera3D& camera) {
         return;
     }
     if (match.aimAmount > 0.6f) {
-        DrawCircleV({ cx, cy }, 2.5f, Fade(BLACK, 0.6f));
-        DrawCircleV({ cx, cy }, 1.5f, { 240, 80, 60, 255 });   // a red dot sight
+        // The reticle shows up as the sight reaches your eye. Iron sights don't need one:
+        // you line up the top of the front post with the target.
+        float fadeIn = Clamp((match.aimAmount - 0.75f) / 0.25f, 0, 1);
+        Color red = Fade({ 255, 60, 45, 255 }, fadeIn);
+        if (opticLook(gun) == 1) {
+            DrawCircleV({ cx, cy }, 4, Fade({ 255, 60, 45, 255 }, 0.25f * fadeIn));   // glow
+            DrawCircleV({ cx, cy }, 2, red);
+        }
+        if (opticLook(gun) == 2) {
+            DrawRing({ cx, cy }, 15, 16.5f, 0, 360, 48, red);
+            DrawCircleV({ cx, cy }, 1.6f, red);
+        }
         return;
     }
 
@@ -451,23 +459,54 @@ void updateMatchResults(App& app) {
     y += 30;
     float kd = you.deaths > 0 ? (float)you.kills / you.deaths : (float)you.kills;
     int accuracy = match.shotsFired > 0 ? match.shotsHit * 100 / match.shotsFired : 0;
-    auto statLine = [&](const char* name, const char* value) {
-        ui::text(name, x, y, 16, ui::TEXT);
-        ui::textRight(value, x + w, y, 16, ui::TEXT);
-        y += 24;
+    // Stats in two columns to leave room for the XP
+    float colW = (w - 30) / 2;
+    auto statLine = [&](int index, const char* name, const char* value) {
+        float sx = x + (index % 2) * (colW + 30);
+        float sy = y + (index / 2) * 24;
+        ui::text(name, sx, sy, 16, ui::TEXT);
+        ui::textRight(value, sx + colW, sy, 16, ui::TEXT);
     };
-    statLine("KILLS", TextFormat("%d", you.kills));
-    statLine("DEATHS", TextFormat("%d", you.deaths));
-    statLine("K/D", TextFormat("%.2f", kd));
-    statLine("HEADSHOTS", TextFormat("%d", match.headshots));
-    statLine("ACCURACY", TextFormat("%d%%", accuracy));
-    y += 10;
+    statLine(0, "KILLS", TextFormat("%d", you.kills));
+    statLine(1, "DEATHS", TextFormat("%d", you.deaths));
+    statLine(2, "K/D", TextFormat("%.2f", kd));
+    statLine(3, "HEADSHOTS", TextFormat("%d", match.headshots));
+    statLine(4, "ACCURACY", TextFormat("%d%%", accuracy));
+    y += 3 * 24 + 12;
+
+    // Player level
+    const PlayerXpResult& p = match.playerResult;
+    ui::text("PLAYER XP", x, y, 18, ui::TEXT_DIM);
+    ui::textRight(TextFormat("+%d XP", p.killXp + p.bonusXp), x + w, y + 2, 18, ui::OLIVE);
+    y += 28;
+    ui::text(TextFormat("LV %d", p.levelAfter), x, y - 4, 16, ui::ACCENT);
+    float barX = x + 56, barW = w - 56;
+    DrawRectangle((int)barX, (int)y + 2, (int)barW, 6, Fade(ui::TEXT_DIM, 0.3f));
+    float fraction = p.levelAfter >= MAX_PLAYER_LEVEL ? 1.0f : (float)p.xpAfter / xpNeededForPlayerLevel(p.levelAfter);
+    DrawRectangle((int)barX, (int)y + 2, (int)(barW * fraction), 6, ui::ACCENT);
+    y += 16;
+    const char* bonusName = match.winner == 0 ? "Win bonus" : (match.winner == 1 ? "Match bonus" : "Draw bonus");
+    ui::text(TextFormat("Kills +%d   %s +%d", p.killXp, bonusName, p.bonusXp), x, y, 15, ui::TEXT_DIM);
+    if (p.levelAfter > p.levelBefore) {
+        ui::textRight(TextFormat("LEVEL UP!  %d > %d", p.levelBefore, p.levelAfter), x + w, y, 15, ui::ACCENT);
+    }
+    if (!p.unlocks.empty()) {
+        y += 20;
+        std::string list = "NEW WEAPON: ";
+        for (int i = 0; i < (int)p.unlocks.size(); i++) {
+            if (i > 0) list += ", ";
+            list += p.unlocks[i];
+        }
+        ui::text(list.c_str(), x, y, 15, ui::GOOD);
+    }
+    y += 32;
+
     ui::text("WEAPON XP", x, y, 18, ui::TEXT_DIM);
-    y += 30;
+    y += 28;
     for (int g = 0; g < 2; g++) {
         if (match.results[g].xp <= 0) continue;
         drawWeaponXp(match.results[g], x, y, w);
-        y += 120;
+        y += 104;
     }
 
     // Buttons

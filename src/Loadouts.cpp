@@ -5,7 +5,7 @@
 const int MAX_LOADOUTS = 8;
 
 // Switch to the next/previous weapon that fits this slot (primary or secondary)
-static void cycleWeapon(WeaponBuild& build, bool primarySlot, int direction) {
+static void cycleWeapon(const Profile& profile, WeaponBuild& build, bool primarySlot, int direction) {
     int count = (int)WEAPONS.size();
     int next = build.weapon;
     for (int tries = 0; tries < count; tries++) {
@@ -16,10 +16,10 @@ static void cycleWeapon(WeaponBuild& build, bool primarySlot, int direction) {
     build.weapon = next;
 }
 
-// A card showing one weapon. Returns true when the card itself is clicked.
 static bool weaponCard(App& app, Rectangle r, const char* label, WeaponBuild& build, bool primarySlot) {
     const WeaponDef& weapon = WEAPONS[build.weapon];
     const WeaponProgress& progress = app.profile.weaponProgress[build.weapon];
+    bool locked = !weaponUnlocked(app.profile, build.weapon);
 
     Rectangle leftArrow = { r.x + r.width - 74, r.y + 8, 30, 30 };
     Rectangle rightArrow = { r.x + r.width - 38, r.y + 8, 30, 30 };
@@ -31,22 +31,29 @@ static bool weaponCard(App& app, Rectangle r, const char* label, WeaponBuild& bu
 
     ui::text(label, r.x + 16, r.y + 12, 16, ui::TEXT_DIM);
     ui::text(weapon.weaponClass.c_str(), r.x + 16, r.y + 56, 16, ui::OLIVE);
-    ui::text(weapon.name.c_str(), r.x + 16, r.y + 76, 26, ui::TEXT);
+    ui::text(weapon.name.c_str(), r.x + 16, r.y + 76, 26, locked ? ui::LOCKED : ui::TEXT);
     ui::textRight(TextFormat("LEVEL %d", progress.level), r.x + r.width - 16, r.y + 84, 16, ui::TEXT_DIM);
 
-    // Attachment pips
-    for (int i = 0; i < MAX_ATTACHMENTS; i++) {
-        Color c = i < build.attachmentCount() ? ui::ACCENT : Fade(ui::TEXT_DIM, 0.4f);
-        DrawRectangle((int)(r.x + 16 + i * 16), (int)(r.y + 38), 10, 10, c);
+    if (locked) {
+        ui::lockIcon(r.x + 16, r.y + 36, 14, ui::LOCKED);
+        ui::text(TextFormat("You need to be level %d to unlock this weapon", weapon.unlockLevel),
+            r.x + 38, r.y + 37, 14, ui::LOCKED);
+    }
+    else {
+        // Attachment pips
+        for (int i = 0; i < MAX_ATTACHMENTS; i++) {
+            Color c = i < build.attachmentCount() ? ui::ACCENT : Fade(ui::TEXT_DIM, 0.4f);
+            DrawRectangle((int)(r.x + 16 + i * 16), (int)(r.y + 38), 10, 10, c);
+        }
+        // Camo swatch
+        app.assets.drawCamoSwatch(build.camo, { r.x + r.width - 110, r.y + 44, 26, 26 });
     }
 
-    // Camo swatch
-    app.assets.drawCamoSwatch(build.camo, { r.x + r.width - 110, r.y + 44, 26, 26 });
+    if (ui::button(leftArrow, "<")) cycleWeapon(app.profile, build, primarySlot, -1);
+    if (ui::button(rightArrow, ">")) cycleWeapon(app.profile, build, primarySlot, +1);
 
-    if (ui::button(leftArrow, "<")) cycleWeapon(build, primarySlot, -1);
-    if (ui::button(rightArrow, ">")) cycleWeapon(build, primarySlot, +1);
-
-    return hovered && IsMouseButtonPressed(MOUSE_BUTTON_LEFT);
+    // A locked gun can't be opened in the workshop
+    return !locked && hovered && IsMouseButtonPressed(MOUSE_BUTTON_LEFT);
 }
 
 // A small card for equipment; clicking it cycles through the choices
@@ -184,6 +191,18 @@ void updateLoadouts(App& app) {
 
     ui::text("Click a weapon to customize it. Use < > to swap weapons.", x, 512, 16, ui::TEXT_DIM);
     ui::text("Click equipment to cycle through options.", x, 534, 16, ui::TEXT_DIM);
+
+#ifndef NDEBUG
+    // TESTING ONLY: - / = lower or raise your player level
+    if (IsKeyPressed(KEY_MINUS) && app.profile.playerLevel > 1) {
+        app.profile.playerLevel--;
+        app.profile.playerXp = 0;
+    }
+    if (IsKeyPressed(KEY_EQUAL) && app.profile.playerLevel < MAX_PLAYER_LEVEL) {
+        app.profile.playerLevel++;
+        app.profile.playerXp = 0;
+    }
+#endif
 
     ui::backHint("BACK");
     if (IsKeyPressed(KEY_ESCAPE)) {

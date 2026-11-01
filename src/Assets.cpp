@@ -251,24 +251,38 @@ void Assets::drawWeapon(const WeaponBuild& build, Vector3 position, float yaw, f
     }
     if (stock == 3) part({ -L * 0.31f, 0.01f, 0 }, { L * 0.08f, 0.04f, 0.04f }, darkMetal, nullptr);
 
-    // Optic on the top rail
+    // Optic on the top rail. Red dots and holo sights are open frames, so when
+    // you aim you look through the middle of them (see sightPoint below).
     int optic = look(SLOT_OPTIC);
     if (optic == 0) {   // iron sights
-        part({ -L * 0.2f, 0.135f, 0 }, { 0.03f, 0.05f, 0.03f }, darkMetal, nullptr);
-        part({ L * 0.58f, 0.115f, 0 }, { 0.02f, 0.07f, 0.02f }, darkMetal, nullptr);
+        float rear = -L * 0.2f;
+        part({ rear, 0.117f, 0 }, { 0.03f, 0.014f, 0.045f }, darkMetal, nullptr);             // rear base
+        part({ rear, 0.139f, 0.015f }, { 0.03f, 0.032f, 0.012f }, darkMetal, nullptr);        // rear post, right
+        part({ rear, 0.139f, -0.015f }, { 0.03f, 0.032f, 0.012f }, darkMetal, nullptr);       // rear post, left
+        part({ L * 0.58f, 0.115f, 0 }, { 0.02f, 0.07f, 0.012f }, darkMetal, nullptr);         // front post (top at 0.15)
     }
-    if (optic == 1) {
-        part({ 0, 0.14f, 0 }, { 0.08f, 0.06f, 0.05f }, metal, nullptr);
-        part({ 0.041f, 0.15f, 0 }, { 0.005f, 0.02f, 0.02f }, RED, nullptr);
+    if (optic == 1) {   // red dot: a small square window
+        part({ 0.01f, 0.118f, 0 }, { 0.08f, 0.016f, 0.045f }, metal, nullptr);               // mount
+        float cy = 0.155f, h = 0.062f, w = 0.056f, t = 0.008f, d = 0.04f, x = 0.02f;
+        part({ x, cy - h / 2 + t / 2, 0 }, { d, t, w }, metal, nullptr);                      // bottom
+        part({ x, cy + h / 2 - t / 2, 0 }, { d, t, w }, metal, nullptr);                      // top
+        part({ x, cy, w / 2 - t / 2 }, { d, h, t }, metal, nullptr);                          // sides
+        part({ x, cy, -w / 2 + t / 2 }, { d, h, t }, metal, nullptr);
+        part({ x - d / 2 + 0.004f, cy - h / 2 + t + 0.002f, 0 }, { 0.006f, 0.004f, 0.006f }, RED, nullptr);   // the emitter
     }
-    if (optic == 2) {
-        part({ 0, 0.125f, 0 }, { 0.12f, 0.03f, 0.06f }, metal, nullptr);
-        part({ 0.04f, 0.17f, 0 }, { 0.02f, 0.07f, 0.065f }, metal, nullptr);
+    if (optic == 2) {   // holo sight: a wider window on a base with a battery box
+        part({ 0, 0.125f, 0 }, { 0.12f, 0.03f, 0.06f }, metal, nullptr);                     // base
+        float cy = 0.18f, h = 0.074f, w = 0.07f, t = 0.008f, d = 0.03f, x = 0.045f;
+        part({ x, cy - h / 2 + t / 2, 0 }, { d, t, w }, metal, nullptr);
+        part({ x, cy + h / 2 - t / 2, 0 }, { d, t, w }, metal, nullptr);
+        part({ x, cy, w / 2 - t / 2 }, { d, h, t }, metal, nullptr);
+        part({ x, cy, -w / 2 + t / 2 }, { d, h, t }, metal, nullptr);
     }
-    if (optic == 3) {
+    if (optic == 3) {   // scope: you look through it with the scope overlay instead
         part({ 0, 0.16f, 0 }, { 0.36f, 0.065f, 0.065f }, darkMetal, nullptr);
         part({ 0.16f, 0.16f, 0 }, { 0.06f, 0.085f, 0.085f }, darkMetal, nullptr);
         part({ -0.15f, 0.16f, 0 }, { 0.05f, 0.08f, 0.08f }, darkMetal, nullptr);
+        part({ 0, 0.12f, 0 }, { 0.08f, 0.02f, 0.04f }, metal, nullptr);                      // mount
     }
 
     // Laser on the side of the handguard
@@ -311,6 +325,18 @@ Vector3 Assets::slotAnchor(const WeaponBuild& build, int slot, Vector3 position,
     float x = local.x * cosf(radians) + local.z * sinf(radians);
     float z = -local.x * sinf(radians) + local.z * cosf(radians);
     return { position.x + x * scale, position.y + local.y * scale, position.z + z * scale };
+}
+
+// Where you look through the sights, in the weapon's own units (muzzle toward +x, y up).
+// x is the part of the sight nearest your eye, y is the height of the line you aim along.
+SightPoint Assets::sightPoint(const WeaponBuild& build) const {
+    float L = WEAPONS[build.weapon].bodyLength;
+    switch (attachmentLook(build, SLOT_OPTIC)) {
+        case 1:  return { 0.0f, 0.155f };    // red dot window
+        case 2:  return { 0.03f, 0.18f };    // holo window
+        case 3:  return { -0.175f, 0.16f };  // back of the scope
+        default: return { -L * 0.2f, 0.15f };   // rear iron sight, lined up with the top of the front post
+    }
 }
 
 void Assets::drawSoldier(const WeaponBuild& weapon, Vector3 position, float yaw, float time,

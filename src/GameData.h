@@ -20,6 +20,8 @@ const char* slotName(int slot);
 
 const int MAX_ATTACHMENTS = 5;   // how many slots can be filled at once
 const int MAX_WEAPON_LEVEL = 30;
+const int MAX_PLAYER_LEVEL = 55;
+
 
 struct Stats {
     int damage = 0;
@@ -60,6 +62,7 @@ struct WeaponDef {
     int magazineSize;
     bool isPrimary;            // primaries go in slot 1, the rest in slot 2
     float bodyLength;          // for the 3D preview
+    int unlockLevel;
     std::vector<Attachment> attachments;
 };
 
@@ -89,6 +92,7 @@ struct WeaponProgress {
 // Everything about the player that should be saved
 struct Profile {
     int playerLevel = 1;
+    int playerXp = 0;   // xp toward the next player level
     std::vector<Loadout> loadouts;
     std::vector<WeaponProgress> weaponProgress;   // one per weapon
 };
@@ -106,5 +110,16 @@ Profile makeStartingProfile();
 
 int xpNeededForLevel(int level);
 void addWeaponXp(WeaponProgress& progress, int amount);
+int xpNeededForPlayerLevel(int level);
+void addPlayerXp(Profile& profile, int amount);
+bool weaponUnlocked(const Profile& profile, int weapon);
+
+
+
+
+// Saving your progress (SaveFile.cpp): profile.cfg next to game.exe
+void saveProfile(const Profile& profile);
+Profile loadProfile();   // reads profile.cfg, or makes a fresh profile if there isn't one
 Stats statsWithAttachments(const WeaponBuild& build);
+int attachmentLook(const WeaponBuild& build, int slot);   // the 3D shape in that slot (0 = nothing fitted)
 int magazineWithAttachments(const WeaponBuild& build);

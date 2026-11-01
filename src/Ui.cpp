@@ -129,6 +129,24 @@ void begin3D(Camera3D camera) {
     rlEnableDepthTest();
 }
 
+void beginCloseUp(Camera3D camera, double nearPlane, double farPlane) {
+    rlDrawRenderBatchActive();   // draw everything queued so far first
+
+    // Forget how far away everything was (the depth buffer), but keep the picture:
+    // with color writing switched off, clearing only clears the depth
+    rlColorMask(false, false, false, false);
+    rlClearScreenBuffers();
+    rlColorMask(true, true, true, true);
+
+    // Same view as before, but with new near and far limits
+    rlMatrixMode(RL_PROJECTION);
+    rlLoadIdentity();
+    double top = nearPlane * tan(camera.fovy * 0.5 * DEG2RAD);
+    double right = top * WIDTH / HEIGHT;
+    rlFrustum(-right, right, -top, top, nearPlane, farPlane);
+    rlMatrixMode(RL_MODELVIEW);
+}
+
 void end3D() {
     EndMode3D();
     if (drawingLowRes) {

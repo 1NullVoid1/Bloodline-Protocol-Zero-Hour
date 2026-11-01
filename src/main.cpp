@@ -31,7 +31,7 @@ int main() {
     app.settings = settings;
     app.antiAliasingAtStart = settings.antiAliasing;
     setupGameData();
-    app.profile = makeStartingProfile();
+    app.profile = loadProfile();   // your levels and loadouts from last time (profile.cfg)
     app.assets.load(settings.highTextures);
 
     while (!WindowShouldClose() && !app.quit) {
@@ -62,6 +62,7 @@ int main() {
     }
 
     saveSettings(app.settings);
+    saveProfile(app.profile);
     app.assets.unload();
     sfx::unload();
     CloseAudioDevice();

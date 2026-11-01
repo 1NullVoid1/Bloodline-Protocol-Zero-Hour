@@ -93,6 +93,7 @@ void setupGameData() {
     rifle.magazineSize = 30;
     rifle.isPrimary = true;
     rifle.bodyLength = 1.0f;
+    rifle.unlockLevel = 1;
     addStandardAttachments(rifle, 45, 60);
     WEAPONS.push_back(rifle);
 
@@ -104,6 +105,7 @@ void setupGameData() {
     smg.magazineSize = 32;
     smg.isPrimary = true;
     smg.bodyLength = 0.75f;
+    smg.unlockLevel = 1;
     addStandardAttachments(smg, 45, 64);
     WEAPONS.push_back(smg);
 
@@ -115,6 +117,7 @@ void setupGameData() {
     sniper.magazineSize = 5;
     sniper.isPrimary = false;
     sniper.bodyLength = 1.65f;
+    sniper.unlockLevel = 1;
     addStandardAttachments(sniper, 8, 12);
     WEAPONS.push_back(sniper);
 
@@ -126,11 +129,12 @@ void setupGameData() {
     pistol.magazineSize = 10;
     pistol.isPrimary = false;
     pistol.bodyLength = 0.45f;
+    pistol.unlockLevel = 1;
     addStandardAttachments(pistol, 15, 30);
     WEAPONS.push_back(pistol);
 
     WeaponDef shotgun;
-    shotgun.name = "SHAWTY";
+    shotgun.name = "Shawty";
     shotgun.weaponClass = "Shotgun";
     shotgun.base = { 80, 20, 30, 40, 50 };
     shotgun.fireRate = 75;
@@ -138,6 +142,7 @@ void setupGameData() {
     shotgun.isPrimary = true;
     shotgun.bodyLength = 1.4f;
     addStandardAttachments(shotgun, 10, 20);
+    shotgun.unlockLevel = 2;
     add(shotgun, "Thunder & Lightning Comp", "Compensator", SLOT_MUZZLE, 14, { 0, -3, 6, 3, -1 }, 4);
     WEAPONS.push_back(shotgun);
 
@@ -210,6 +215,22 @@ void addWeaponXp(WeaponProgress& progress, int amount) {
     }
 }
 
+// Player levels take longer than weapon levels: 1,250 XP for level 2, then 250 more each level
+int xpNeededForPlayerLevel(int level) {
+    return 1000 + level * 250;
+}
+
+void addPlayerXp(Profile& profile, int amount) {
+    profile.playerXp += amount;
+    while (profile.playerLevel < MAX_PLAYER_LEVEL && profile.playerXp >= xpNeededForPlayerLevel(profile.playerLevel)) {
+        profile.playerXp -= xpNeededForPlayerLevel(profile.playerLevel);
+        profile.playerLevel++;
+    }
+    if (profile.playerLevel == MAX_PLAYER_LEVEL) {
+        profile.playerXp = 0;
+    }
+}
+
 static int clampStat(int value) {
     if (value < 0) return 0;
     if (value > 100) return 100;
@@ -244,4 +265,13 @@ int magazineWithAttachments(const WeaponBuild& build) {
         return weapon.attachments[index].magazineSize;
     }
     return weapon.magazineSize;
+}
+
+int attachmentLook(const WeaponBuild& build, int slot) {
+    int index = build.attachment[slot];
+    return index < 0 ? 0 : WEAPONS[build.weapon].attachments[index].look;
+}
+
+bool weaponUnlocked(const Profile& profile, int weapon) {
+	return profile.playerLevel >= WEAPONS[weapon].unlockLevel;
 }

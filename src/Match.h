@@ -116,6 +116,20 @@ struct WeaponXpResult {
     std::vector<std::string> unlocks;
 };
 
+// ...and how you leveled up as a player
+struct PlayerXpResult {
+    int killXp = 0;      // from your kills
+    int bonusXp = 0;     // for finishing the match (more for a win)
+    int levelBefore = 1, levelAfter = 1;
+    int xpAfter = 0;
+    std::vector<std::string> unlocks; // weapon this level-up unlocked
+};
+
+// Player XP for finishing a match
+const int WIN_BONUS_XP = 1000;
+const int DRAW_BONUS_XP = 750;
+const int LOSS_BONUS_XP = 500;
+
 struct Match {
     Map map;
     std::vector<Soldier> soldiers;
@@ -150,9 +164,11 @@ struct Match {
     int headshots = 0;
     int gunKills[2] = { 0, 0 };       // kills with your primary and secondary
     int gunXp[2] = { 0, 0 };          // XP earned by each of your guns
+    int killXp = 0;                   // player XP from kills
 
     // Filled in when the match ends
     WeaponXpResult results[2];
+    PlayerXpResult playerResult;
     bool resultsReady = false;
 };
 
@@ -174,6 +190,8 @@ float moveSpeed(const Gun& gun);
 float effectiveRange(const Gun& gun);
 int pelletCount(const Gun& gun);
 float aimZoom(const Gun& gun);
+int opticLook(const Gun& gun);            // 0 = iron sights, 1 = red dot, 2 = holo, 3 = scope
+bool usesScope(const Gun& gun);           // aiming shows the scope picture instead of the gun
 float damageAt(const Gun& gun, float distance, bool headshot);
 float playerSpread(const Match& match);   // your bullet spread right now, in degrees
 void fireGun(Match& match, int shooter, float spreadDegrees);

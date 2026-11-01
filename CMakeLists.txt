@@ -17,6 +17,7 @@ FetchContent_MakeAvailable(raylib)
 add_executable(game
     src/main.cpp
     src/GameData.cpp
+    src/SaveFile.cpp
     src/Assets.cpp
     src/Ui.cpp
     src/Common.cpp
